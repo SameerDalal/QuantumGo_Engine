@@ -18,8 +18,8 @@ URL_PRODUCTION = 'https://govariants.com/'
 URL_LOCALHOST = 'http://localhost:5173/'
 
 VARIANT = 'quantum'
-WIDTH = 5
-HEIGHT = 5
+WIDTH = 19
+HEIGHT = 19
 
 USERNAME_PRODUCTION = 'QuantumBot'
 PASSWORD_PRODUCTION = PASSWORD_PRODUCTION
@@ -97,7 +97,7 @@ class Board:
             processed_actions = []
             for move in sgf_data:
                 #converts letter coordinates to numerical coordinates then gets the key corrresponding to the numerical coordinates and adds it to processed_actions list
-                processed_actions.append(reverse_action_map_5x5.get(tuple([ord(move[3:-1][0])-ord('a')+1, ord(move[3:-1][1])-ord('a')+1]), 'invalid'))
+                processed_actions.append(reverse_action_map_19x19.get(tuple([ord(move[3:-1][0])-ord('a')+1, ord(move[3:-1][1])-ord('a')+1]), 'invalid'))
             return processed_actions
         else: 
             print("Error getting game moves")
@@ -161,11 +161,11 @@ class Player:
         take_seat_button.click()
 
     def make_move(self, action):
-        if action == 25:
+        if action == 361:
             #press pass button
             pass_button = self.driver.find_element(By.XPATH, '//button[contains(text(), "Pass")]')
             pass_button.click()
-        elif action == 26:
+        elif action == 362:
             #press resign button
             resign_button = self.driver.find_element(By.XPATH, '//button[contains(text(), "Resign")]')
             resign_button.click()
@@ -174,7 +174,7 @@ class Player:
                 EC.presence_of_element_located((By.CSS_SELECTOR, 'svg.board'))
             )
             # we need the offset because it corresponds an action to a specific spot on the board for the driver to click on 
-            offset_x, offset_y = get_offset_5x5(action_map_5x5[action])
+            offset_x, offset_y = get_offset_19x19(action_map_19x19[action])
             action_chains = ActionChains(self.driver)
             action_chains.move_to_element_with_offset(board_svg, offset_x, offset_y).click().perform()
 

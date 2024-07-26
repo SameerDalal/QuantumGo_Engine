@@ -1,11 +1,11 @@
 import random
-from action_space import action_map_9x9, action_map_5x5
+from action_space import action_map_19x19, action_map_9x9, action_map_5x5
 from board import Board
 from board import Player
 import time
 from concurrent.futures import ThreadPoolExecutor
-from selenium.common.exceptions import UnexpectedAlertPresentException
 from threading import Lock
+
 
 counter = 1
 counter_lock = Lock()
@@ -26,7 +26,7 @@ class MCTS:
         player_black = Player('black', board_driver)
         player_black.take_seat()
         
-        parent = Node(board.get_sgf_data(), action_map_5x5.copy(), None, 0, 0)
+        parent = Node(board.get_sgf_data(), action_map_19x19.copy(), None, 0, 0)
 
         need_to_select_player = False
 
@@ -47,9 +47,9 @@ class MCTS:
 
             player_black.make_move(next_move)
             
-            if(next_move == 26):
+            if(next_move == 362):
                 break
-            elif(next_move == 25):
+            elif(next_move == 361):
                 player_has_passed = True
         
             parent = parent.get_best_child()
@@ -57,6 +57,13 @@ class MCTS:
             parent.get_action_space().pop(next_move)
 
             need_to_select_player = True
+
+            #need to wait until player white makes move.
+            time.sleep(5)
+
+            #the move that player white makes is not available to player black.
+            parent.get_action_space().pop(board.get_sgf_data()[-1])
+
 
             """
             profiler.disable()
@@ -152,99 +159,110 @@ class Node:
             self.children.append(child)
 
     def simulate_children_and_update(self):
+        def simulate_child(child):
+            global counter
+            with counter_lock:
+                print(f"Simulating child {counter}")
+                counter += 1
+
+            child_result = child.simulate(child.get_board_state())
+            #resimulate if error occurs
+            """
+            while child_result == "Error":
+                child_result = child.simulate(child.get_board_state())
+            """
+            if child_result == 'B':
+                child.set_games_won(child.get_games_won() + 1)
+            child.set_games_played(child.get_games_played() + 1)
 
         with ThreadPoolExecutor() as executor:
             executor.map(simulate_child, self.children)
 
         print("Done simulating the next round of nodes")
+    
+    def simulate(self, previous_game_moves):
 
-    def simulate(self, game_moves):
-        start_time = time.time()
+        current_game_moves = []
 
-        new_board = Board()
-        new_board_driver = new_board.get_driver()
-        new_board.login()
-        new_board.create_game()
+        temp_action_space = action_map_19x19.copy()
+             
+        current_game_moves = previous_game_moves
 
-        temp_action_space = action_map_5x5.copy()
-        player_has_passed = False
+        total_moves = len(current_game_moves)
 
-        player_black = Player('black', new_board_driver)
-        player_black.take_seat()
- 
-        player_white = Player('white', new_board_driver)
-        player_white.take_seat()
+        while True:
+        
+            random_action = random.choice(list(temp_action_space.keys()))
 
-        try: 
-            for index, move in enumerate(game_moves):
-                player = player_black if index % 2 == 0 else player_white
-                player.select_player()
-                player.make_move(move)
-                temp_action_space.pop(move)
-
-            total_moves = len(game_moves)   
-
-            while True:
-            
+            #cannot pass during quantum stone placment phase
+            if total_moves <= 2 and random_action == 361:
                 random_action = random.choice(list(temp_action_space.keys()))
+                            
+            #if player resigns end game
+            if(random_action == 362):
+                current_game_moves.append(random_action)
+                return 'W' if len(current_game_moves) % 2 == 0 else 'B'
+            
+            # if both players pass end game
+            elif(random_action == 361 and current_game_moves[-1]):
+                current_game_moves.append(random_action)
+                #here need to run simulation to see who won
+                #why is get_game_result automatically called?
+                #return get_game_result(current_game_moves)
+            
+            else:
+                current_game_moves.append(random_action)
+                temp_action_space.pop(random_action)
 
-                #cannot pass during quantum stone placment phase
-                if total_moves <= 2 and random_action == 25:
-                    random_action = random.choice(list(temp_action_space.keys()))
-                               
-                print("Random action", random_action)
-                player = player_black if total_moves % 2 == 0 else player_white
-                player.select_player(player_has_passed)
-                player.make_move(random_action)
-                
-                if(random_action == 26):
-                    break
-                elif(random_action == 25):
-                    player_has_passed = True
-                else:
-                    temp_action_space.pop(random_action)
+            total_moves += 1
 
-                total_moves += 1
-        except UnexpectedAlertPresentException as err:
-            #print(err)
-            return "Error"
-                
-        end_time = time.time()
-        print(f"Simulation time: {end_time - start_time:.2f} seconds")    
-        return new_board.get_game_result()
+        #dont need return statement here b/c there is no case where a player dosent resign or pass
 
     def get_best_child(self):
 
         max_ratio = 0
         best_child = None
-        #need to make sure we are not just selecting the first child if all ratios are same
+        best_children = []
+
         for child in self.children:
             if child.get_games_played() == 0: # not sure why some children have 0 games played
                 continue
+
             win_ratio = child.get_games_won() / child.get_games_played()
+
             if win_ratio > max_ratio:
                 max_ratio = win_ratio
                 best_child = child
-    
-        return best_child
+                best_children = []
+            
+            #need to make sure we are not just selecting the first child if some ratios are same
+            #exploration vs exploitation - use upper confidence bound instead
+            elif win_ratio == max_ratio:
+                best_children.append(child)
+
+        return best_child if best_children == [] else random.choice(best_children)
 
     def get_best_move(self):
 
         best_child = self.get_best_child()
         return best_child.get_next_move()
 
-def simulate_child(child):
-    global counter
-    with counter_lock:
-        print(f"Simulating child {counter}")
-        counter += 1
 
-    child_result = child.simulate(child.get_board_state())
-    #resimulate if error occurs
-    while child_result == "Error":
-        child_result = child.simulate(child.get_board_state())
-    
-    if child_result == 'B':
-        child.set_games_won(child.get_games_won() + 1)
-    child.set_games_played(child.get_games_played() + 1)
+def get_game_result(game_moves):
+    new_board = Board()
+    new_board_driver = new_board.get_driver()
+    new_board.login()
+    new_board.create_game()
 
+    player_black = Player('black', new_board_driver)
+    player_black.take_seat()
+ 
+    player_white = Player('white', new_board_driver)
+    player_white.take_seat()
+
+    for index, move in enumerate(game_moves):
+        player = player_black if index % 2 == 0 else player_white
+        player.select_player()
+        player.make_move(move)
+
+    return new_board.get_game_result()
