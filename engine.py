@@ -6,9 +6,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
 
-
-counter = 1
-counter_lock = Lock()
+import copy
 
 #monte carlo tree search
 class MCTS:
@@ -26,7 +24,7 @@ class MCTS:
         player_black = Player('black', board_driver)
         player_black.take_seat()
         
-        parent = Node(board.get_sgf_data(), action_map_19x19.copy(), None, 0, 0)
+        parent = Node([], action_map_19x19.copy(), None, 0, 0, None)
 
         need_to_select_player = False
 
@@ -37,7 +35,7 @@ class MCTS:
             profiler = cProfile.Profile()
             profiler.enable()
             """
-            parent.create_children(parent.get_board_state(), parent.get_action_space())
+            parent.create_children(parent.get_board_state(), parent.get_action_space(), parent)
             parent.simulate_children_and_update()
 
             if(need_to_select_player):
@@ -59,7 +57,7 @@ class MCTS:
             need_to_select_player = True
 
             #need to wait until player white makes move.
-            time.sleep(5)
+            time.sleep(10)
 
             #the move that player white makes is not available to player black.
             parent.get_action_space().pop(board.get_sgf_data()[-1])
@@ -78,21 +76,21 @@ class MCTS:
         
 class Node:
 
-    def __init__(self, board_state, action_space, parent, games_played, games_won):
+    def __init__(self, board_state, action_space, parent, games_played, games_won, next_move):
 
-        self.board_state = board_state
+        self.board_state = copy.copy(board_state)
 
         self.action_space = action_space
 
-        self.parent = parent
-
-        self.children = []
+        self.parent = copy.copy(parent)
 
         self.games_played = games_played
 
         self.games_won = games_won
 
-        self.next_move = None
+        self.next_move = next_move
+
+        self.children = []
 
     def get_board_state(self):
             
@@ -106,9 +104,9 @@ class Node:
             
         return self.parent    
 
-    def get_child(self):
+    def get_children(self):
     
-        return self.child
+        return self.children
 
     def get_games_played(self):
 
@@ -136,7 +134,7 @@ class Node:
 
     def set_child(self, child):
 
-        self.child = child
+        self.children.append(child)
 
     def set_games_played(self, games_played):
             
@@ -150,48 +148,52 @@ class Node:
 
         self.next_move = next_move
 
-    def create_children(self, board_state, action_space):
+    def create_children(self, board_state, action_space, parent):
 
         for key, value in action_space.items():
 
-            child = Node(board_state, action_space, self, 0, 0)
-            child.set_next_move(key)
-            self.children.append(child)
+            child = Node(board_state, action_space, parent, 0, 0, key)
+            parent.set_child(child)
+            child.set_parent(parent)
+
 
     def simulate_children_and_update(self):
-        def simulate_child(child):
-            global counter
-            with counter_lock:
-                print(f"Simulating child {counter}")
-                counter += 1
 
-            child_result = child.simulate(child.get_board_state())
-            #resimulate if error occurs
-            """
-            while child_result == "Error":
-                child_result = child.simulate(child.get_board_state())
-            """
+        def simulate_child(child):
+            
+            child_board_state = child.get_board_state()
+            child_board_state.append(child.get_next_move())
+
+            child.set_board_state(child_board_state)
+
+            print("Child board state: ", child.get_board_state())
+
+            child_result = child.simulate(child_board_state.copy())
+        
             if child_result == 'B':
                 child.set_games_won(child.get_games_won() + 1)
             child.set_games_played(child.get_games_played() + 1)
-
+      
         with ThreadPoolExecutor() as executor:
             executor.map(simulate_child, self.children)
+        """
+        for child in self.children:
+            simulate_child(child)
+        """
+        print("Done simulating the next round of children")
 
-        print("Done simulating the next round of nodes")
-    
-    def simulate(self, previous_game_moves):
+    def simulate(self, prev_board_state):
 
         current_game_moves = []
 
         temp_action_space = action_map_19x19.copy()
-             
-        current_game_moves = previous_game_moves
+                
+        current_game_moves = prev_board_state
 
         total_moves = len(current_game_moves)
 
         while True:
-        
+
             random_action = random.choice(list(temp_action_space.keys()))
 
             #cannot pass during quantum stone placment phase
@@ -204,19 +206,19 @@ class Node:
                 return 'W' if len(current_game_moves) % 2 == 0 else 'B'
             
             # if both players pass end game
-            elif(random_action == 361 and current_game_moves[-1]):
-                current_game_moves.append(random_action)
-                #here need to run simulation to see who won
-                #why is get_game_result automatically called?
-                #return get_game_result(current_game_moves)
-            
+            elif(random_action == 361):
+                if(current_game_moves[-1] == 361):
+                    #not simulating correctly
+                    #return get_game_result(current_game_moves)
+                    return 'Test'
+                else:
+                    current_game_moves.append(random_action)
+
             else:
                 current_game_moves.append(random_action)
                 temp_action_space.pop(random_action)
 
             total_moves += 1
-
-        #dont need return statement here b/c there is no case where a player dosent resign or pass
 
     def get_best_child(self):
 
@@ -225,27 +227,25 @@ class Node:
         best_children = []
 
         for child in self.children:
-            if child.get_games_played() == 0: # not sure why some children have 0 games played
-                continue
-
+            
             win_ratio = child.get_games_won() / child.get_games_played()
 
             if win_ratio > max_ratio:
                 max_ratio = win_ratio
                 best_child = child
                 best_children = []
-            
-            #need to make sure we are not just selecting the first child if some ratios are same
-            #exploration vs exploitation - use upper confidence bound instead
             elif win_ratio == max_ratio:
                 best_children.append(child)
-
+                
+        #need to make sure we are not just selecting the first child if some ratios are same
+        #exploration vs exploitation - use upper confidence bound instead
         return best_child if best_children == [] else random.choice(best_children)
 
     def get_best_move(self):
 
         best_child = self.get_best_child()
         return best_child.get_next_move()
+
 
 
 def get_game_result(game_moves):
@@ -259,6 +259,8 @@ def get_game_result(game_moves):
  
     player_white = Player('white', new_board_driver)
     player_white.take_seat()
+
+    time.sleep(5)
 
     for index, move in enumerate(game_moves):
         player = player_black if index % 2 == 0 else player_white
