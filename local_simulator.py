@@ -273,7 +273,6 @@ class LocalSimulatorWithGUI():
 
 class LocalSimulator():
     def __init__(self):
-        self.root = tk.Tk()
         self.game = QuantumGo()
 
     def play_move(self, action, index):
