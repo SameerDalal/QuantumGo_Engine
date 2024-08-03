@@ -11,6 +11,10 @@ import copy
 from local_simulator import LocalSimulator
 from local_simulator import LocalSimulatorWithGUI
 
+from numba import cuda
+import numpy as np
+
+
 
 #monte carlo tree search
 class MCTS:
@@ -171,15 +175,16 @@ class Node:
             
             child.set_games_played(child.get_games_played() + 1)
 
-       
+        start = time.time()
+        """
         with ThreadPoolExecutor() as executor:
             executor.map(simulate_child, self.children)
-
         """
         for child in self.children:
             simulate_child(child)
-        """
-       
+        
+        end = time.time()
+        print("Time taken to simulate children: ", end - start)
         print("Done simulating the next round of children")
 
     def simulate(self, prev_board_state):
@@ -192,11 +197,13 @@ class Node:
 
         total_moves = len(current_game_moves)
 
-        game = LocalSimulator()
-
         index = 0
 
-        while game.get_result() == None:
+        for move in current_game_moves:
+            if(move != 362):
+                temp_action_space.pop(move)
+
+        while True:
 
             random_action = random.choice(list(temp_action_space.keys()))
 
@@ -206,10 +213,19 @@ class Node:
 
             if(random_action == 362):
                 #the game result if one player resigns
-                game.root.destroy()
                 return 'B' if total_moves % 2 == 0 else 'W'
 
-            game.play_move(random_action, index)
+
+            if(random_action == 361 and current_game_moves[-1] == 361):
+                current_game_moves.append(random_action)
+                game = LocalSimulator()
+                print(current_game_moves)
+                game.play_moves(current_game_moves)
+                game_result = game.get_result()
+                print("Game result when both players passed:", game_result)
+                game.display_board()
+                #game.root.destroy()  need this line if running with GUI
+                return game_result
             
             # we dont want to remove the 'pass' action from the action space
             if not (random_action == 361):
@@ -220,12 +236,9 @@ class Node:
             total_moves += 1
             index +=1
 
-            game.display_board()
+            
+
         
-        game_result = game.get_result()
-        print("Game result when both players passed:", game_result)
-        game.root.destroy()
-        return game_result
        
 
     def get_best_child(self):
@@ -252,3 +265,4 @@ class Node:
     def get_best_move(self, child):
 
         return child.get_next_move()
+    
