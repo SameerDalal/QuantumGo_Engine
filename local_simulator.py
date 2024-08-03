@@ -222,12 +222,12 @@ class QuantumGoGUI:
         x1 = offset + x * self.cell_size + offset // 2
         y1 = offset + y * self.cell_size + offset // 2
         if is_quantum:
-            fill_player = "black" if color == Color.BLACK else "white"
+            fill_player = "black" if color == Color.BLACK else "grey"
             fill_green = "green"
             canvas.create_arc(x0, y0, x1, y1, start=90, extent=180, fill=fill_player, tags="stones")
             canvas.create_arc(x0, y0, x1, y1, start=270, extent=180, fill=fill_green, tags="stones")
         else:
-            fill = "black" if color == Color.BLACK else "white"
+            fill = "black" if color == Color.BLACK else "grey"
             canvas.create_oval(x0, y0, x1, y1, fill=fill, tags="stones")
 
 
@@ -255,14 +255,19 @@ class LocalSimulatorWithGUI():
         self.gui = QuantumGoGUI(self.root, self.game)
         self.display_board()
 
-    def play_move(self, action, index):
-        player = Color.BLACK if index % 2 == 0 else Color.WHITE
-        
-        action = 'pass' if action == 361 else Coordinate(action_map_19x19[action])
-                                                         
-        self.game.play_move(player, action)
+    def play_moves(self, actions):
+        index = 0
+        for action in actions:
 
-        self.display_board()
+            player = Color.BLACK if index % 2 == 0 else Color.WHITE
+
+            action = 'pass' if action == 361 else Coordinate(action_map_19x19[action])
+
+            self.game.play_move(player, action)
+
+            index +=1    
+
+            self.display_board()
 
     def get_result(self):
         return self.game.get_result()
@@ -275,12 +280,15 @@ class LocalSimulator():
     def __init__(self):
         self.game = QuantumGo()
 
-    def play_move(self, action, index):
-        player = Color.BLACK if index % 2 == 0 else Color.WHITE
-        
-        action = 'pass' if action == 361 else Coordinate(action_map_19x19[action])
-                                                         
-        self.game.play_move(player, action)
+    def play_moves(self, actions):
+
+        for index, action in enumerate(actions):
+
+            player = Color.BLACK if index % 2 == 0 else Color.WHITE
+
+            action = 'pass' if action == 361 else Coordinate(action_map_19x19[action])
+
+            self.game.play_move(player, action)        
 
     def get_result(self):
         return self.game.get_result()
