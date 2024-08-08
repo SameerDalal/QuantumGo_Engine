@@ -41,35 +41,43 @@ class MCTS:
         while True:
 
             parent.create_children(parent.get_board_state(), parent.get_action_space(), parent)
-            parent.simulate_children_and_update()
+
+            for i in range(5):
+                parent.simulate_children_and_update()
 
             if(need_to_select_player):
                 player_black.select_player(player_has_passed)
 
             best_child = parent.get_best_child()
 
-            next_move = parent.get_best_move(best_child)
+            best_move = parent.get_best_move(best_child)
 
-            print("Best move: ", next_move)
+            print("Best move: ", best_move)
 
-            player_black.make_move(next_move)
+            player_black.make_move(best_move)
             
-            if(next_move == 362):
+            if(best_move == 362):
                 break
-            elif(next_move == 361):
+            elif(best_move == 361):
                 player_has_passed = True
         
             parent = best_child
 
-            parent.get_action_space().pop(next_move)
+            parent.get_action_space().pop(best_move)
 
             need_to_select_player = True
 
-            #need to wait until player white makes move.
+            #need to wait until player white makes move.+
             time.sleep(10)
+            print("Waiting for player white to make move")
 
             # the move that player white makes is not available to player black.
-            parent.get_action_space().pop(board.get_sgf_data()[-1])
+
+            board_state = board.get_sgf_data()
+            
+            parent.get_action_space().pop(board_state[-1])
+
+            parent.set_board_state(board_state)
 
         print("Game Over")
 
@@ -160,13 +168,18 @@ class Node:
     def simulate_children_and_update(self):
 
         def simulate_child(child):
-            
+
+            #if the child is resimulated then the board state does not need to be updated since the same board state will be played again
             child_board_state = child.get_board_state()
-            child_board_state.append(child.get_next_move())
+            child_next_move = child.get_next_move()
 
-            child.set_board_state(child_board_state)
+            if not child_next_move in child_board_state:
 
-            print("Child board state: ", child.get_board_state())
+                child_board_state.append(child_next_move)
+
+                child.set_board_state(child_board_state)
+
+            print("Child board state: ", child_board_state)
 
             child_result = child.simulate(child_board_state.copy())
         
@@ -174,6 +187,8 @@ class Node:
                 child.set_games_won(child.get_games_won() + 1)
             
             child.set_games_played(child.get_games_played() + 1)
+
+
 
         start = time.time()
         """
@@ -185,6 +200,10 @@ class Node:
         
         end = time.time()
         print("Time taken to simulate children: ", end - start)
+
+        for child in self.children:
+            print("Action ", child.get_next_move(), ": ", child.get_games_won(), " / ", child.get_games_played())
+
         print("Done simulating the next round of children")
 
     def simulate(self, prev_board_state):
@@ -200,7 +219,9 @@ class Node:
         index = 0
 
         for move in current_game_moves:
-            if(move != 362):
+            if (move == 362):
+                return 'B' if total_moves % 2 == 0 else 'W'
+            else:
                 temp_action_space.pop(move)
 
         while True:
@@ -214,7 +235,6 @@ class Node:
             if(random_action == 362):
                 #the game result if one player resigns
                 return 'B' if total_moves % 2 == 0 else 'W'
-
 
             if(random_action == 361 and current_game_moves[-1] == 361):
                 current_game_moves.append(random_action)
@@ -236,11 +256,7 @@ class Node:
             total_moves += 1
             index +=1
 
-            
-
         
-       
-
     def get_best_child(self):
 
         max_ratio = 0
