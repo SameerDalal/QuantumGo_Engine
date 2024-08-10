@@ -11,10 +11,6 @@ import copy
 from local_simulator import LocalSimulator
 from local_simulator import LocalSimulatorWithGUI
 
-from numba import cuda
-import numpy as np
-
-
 
 #monte carlo tree search
 class MCTS:
@@ -42,8 +38,11 @@ class MCTS:
 
             parent.create_children(parent.get_board_state(), parent.get_action_space(), parent)
 
-            for i in range(5):
+            start = time.time()
+            for i in range(3):
                 parent.simulate_children_and_update()
+            end = time.time()
+            print("Time taken to simulate children: ", end - start)
 
             if(need_to_select_player):
                 player_black.select_player(player_has_passed)
@@ -78,10 +77,10 @@ class MCTS:
             parent.get_action_space().pop(board_state[-1])
 
             parent.set_board_state(board_state)
-
+            
+            
         print("Game Over")
 
-        
 class Node:
 
     def __init__(self, board_state, action_space, parent, games_played, games_won, next_move):
@@ -164,15 +163,14 @@ class Node:
             parent.set_child(child)
             child.set_parent(parent)
 
-
     def simulate_children_and_update(self):
 
         def simulate_child(child):
 
-            #if the child is resimulated then the board state does not need to be updated since the same board state will be played again
             child_board_state = child.get_board_state()
             child_next_move = child.get_next_move()
 
+            #if the child is resimulated then the board state does not need to be updated since the same board state will be played again
             if not child_next_move in child_board_state:
 
                 child_board_state.append(child_next_move)
@@ -189,21 +187,9 @@ class Node:
             child.set_games_played(child.get_games_played() + 1)
 
 
-
-        start = time.time()
-        """
-        with ThreadPoolExecutor() as executor:
-            executor.map(simulate_child, self.children)
-        """
         for child in self.children:
             simulate_child(child)
         
-        end = time.time()
-        print("Time taken to simulate children: ", end - start)
-
-        for child in self.children:
-            print("Action ", child.get_next_move(), ": ", child.get_games_won(), " / ", child.get_games_played())
-
         print("Done simulating the next round of children")
 
     def simulate(self, prev_board_state):
@@ -242,9 +228,11 @@ class Node:
                 print(current_game_moves)
                 game.play_moves(current_game_moves)
                 game_result = game.get_result()
-                print("Game result when both players passed:", game_result)
-                game.display_board()
-                #game.root.destroy()  need this line if running with GUI
+
+                #need next two lines if running with GUI
+                #game.display_board()
+                #game.root.destroy()
+                
                 return game_result
             
             # we dont want to remove the 'pass' action from the action space
