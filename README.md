@@ -56,3 +56,16 @@ The engine uses the Monte Carlo Tree Search (MCTS) method to determine the next 
 4. **Backpropagation**: The result of the simulation is sent to the root node. 
 
 5. **Best Move Selection**: After a number of iterations, the algorithm selects the move that leads to the child node with the highest win rate. The best child node then becomes the root node and the process is repeated.
+
+
+## Other features
+
+If you would like to see some of the simulations made by the engine, there is a GUI feature available. To use it, modify the following code:
+
+In `engine.py` change `game = LocalSimulator()` to `game = LocalSimulatorWithGUI()`
+
+In `engine.py` uncomment the following lines:
+```
+game.display_board()
+game.root.destroy()
+```
