@@ -9,3 +9,5 @@ pip install requests
 pip install numba
 
 pip install cuda-python
+
+pip install tensorflow

@@ -3,14 +3,22 @@ from action_space import action_map_19x19
 from web_board import Board
 from web_board import Player
 import time
-from concurrent.futures import ThreadPoolExecutor
-from threading import Lock
+
+#from concurrent.futures import ThreadPoolExecutor
+#from threading import Lock
 
 import copy
 
 from local_simulator import LocalSimulator
 from local_simulator import LocalSimulatorWithGUI
 
+import argparse
+
+def arg_parser():
+    parser = argparse.ArgumentParser(description="Resimulate a child node a certain number of times")
+    parser.add_argument('-l', type=int, default=3, help="Number of loops")
+    args = parser.parse_args()
+    return args.l
 
 #monte carlo tree search
 class MCTS:
@@ -37,12 +45,13 @@ class MCTS:
         while True:
 
             parent.create_children(parent.get_board_state(), parent.get_action_space(), parent)
-
+            num_loops = arg_parser()
             start = time.time()
-            for i in range(3):
+            print("Simulating ...")
+            for i in range(num_loops):
                 parent.simulate_children_and_update()
             end = time.time()
-            print("Time taken to simulate children: ", end - start)
+            print(f"Time taken to simulate 362 children {num_loops} times: {end - start:.2f} seconds")
 
             if(need_to_select_player):
                 player_black.select_player(player_has_passed)
@@ -51,7 +60,7 @@ class MCTS:
 
             best_move = parent.get_best_move(best_child)
 
-            print("Best move: ", best_move)
+            print("Best move for engine: Action", best_move)
 
             player_black.make_move(best_move)
             
@@ -66,12 +75,12 @@ class MCTS:
 
             need_to_select_player = True
 
-            #need to wait until player white makes move.+
             time.sleep(10)
             print("Waiting for player white to make move")
 
             # the move that player white makes is not available to player black.
 
+            # FIX: use the board state as the action spaace instead of the sgf data because the game is better represented as the board state instead of the moves in sgf data
             board_state = board.get_sgf_data()
             
             parent.get_action_space().pop(board_state[-1])
@@ -177,8 +186,6 @@ class Node:
 
                 child.set_board_state(child_board_state)
 
-            print("Child board state: ", child_board_state)
-
             child_result = child.simulate(child_board_state.copy())
         
             if child_result == 'B':
@@ -190,7 +197,6 @@ class Node:
         for child in self.children:
             simulate_child(child)
         
-        print("Done simulating the next round of children")
 
     def simulate(self, prev_board_state):
 
@@ -225,7 +231,6 @@ class Node:
             if(random_action == 361 and current_game_moves[-1] == 361):
                 current_game_moves.append(random_action)
                 game = LocalSimulator()
-                print(current_game_moves)
                 game.play_moves(current_game_moves)
                 game_result = game.get_result()
 
