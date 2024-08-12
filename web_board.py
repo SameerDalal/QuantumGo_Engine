@@ -14,7 +14,7 @@ from offset_moves import get_offset_5x5, get_offset_9x9, get_offset_19x19
 from action_space import action_map_5x5, reverse_action_map_5x5, action_map_9x9, reverse_action_map_9x9, action_map_19x19, reverse_action_map_19x19
 from private import PASSWORD_PRODUCTION, PASSWORD_LOCALHOST
 
-URL_PRODUCTION = 'https://govariants.com/'
+URL_PRODUCTION = 'https://www.govariants.com/'
 URL_LOCALHOST = 'http://localhost:5173/'
 
 VARIANT = 'quantum'
@@ -47,23 +47,23 @@ class Board:
     
     def login(self):
 
-        self.driver.get(URL_LOCALHOST + "login")
+        self.driver.get(URL_PRODUCTION + "login")
         self.driver.implicitly_wait(10)  # Wait for the page to load completely
 
         print("At login page Current URL:", self.driver.current_url)
 
         username_input = self.driver.find_element(By.XPATH, '//input[@id="username"]')
         username_input.clear()
-        username_input.send_keys(USERNAME_LOCALHOST)
+        username_input.send_keys(USERNAME_PRODUCTION)
 
         password_input = self.driver.find_element(By.XPATH, '//input[@id="current-password"]')
         password_input.clear()
-        password_input.send_keys(PASSWORD_LOCALHOST)
+        password_input.send_keys(PASSWORD_PRODUCTION)
 
         login_button = self.driver.find_element(By.XPATH, '//button[@type="submit" and contains(text(), "Log in")]')
         login_button.click()
 
-        WebDriverWait(self.driver, 20).until(EC.url_to_be(URL_LOCALHOST))
+        WebDriverWait(self.driver, 10).until(EC.url_to_be(URL_PRODUCTION))
 
         print("Logged in. Current URL:", self.driver.current_url)
 
@@ -91,7 +91,7 @@ class Board:
 
     def get_sgf_data(self):
 
-        response = requests.get(URL_LOCALHOST + "api/game/" + self.game_id + "/sgf")
+        response = requests.get(URL_PRODUCTION + "api/game/" + self.game_id + "/sgf")
         if response.status_code == 200:
             sgf_data = re.findall(r';[BW]\[[a-z]{2}\]',response.content.decode('utf-8'))
             processed_actions = []
