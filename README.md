@@ -60,7 +60,11 @@ The engine uses the Monte Carlo Tree Search (MCTS) method to determine the next 
 
 ## Other features
 
-If you would like to see some of the simulations made by the engine, there is a GUI feature available. To use it, modify the following code:
+If you would like to see some of the simulations made by the engine, there is a GUI feature available. 
+
+NOTE: This significantly increases simulation time even when using the GPU-Accelerated version.
+
+To use it, modify the following code:
 
 In `engine.py` change `game = LocalSimulator()` to `game = LocalSimulatorWithGUI()`
 
