@@ -51,7 +51,7 @@ class MCTS:
             for i in range(num_loops):
                 parent.simulate_children_and_update()
             end = time.time()
-            print(f"Time taken to simulate 362 children {num_loops} times: {end - start:.2f} seconds")
+            print(f"Time taken to simulate {len(parent.get_children())} children {num_loops} times: {end - start:.2f} seconds")
 
             if(need_to_select_player):
                 player_black.select_player(player_has_passed)
@@ -63,7 +63,8 @@ class MCTS:
             print("Best move for engine: Action", best_move)
 
             player_black.make_move(best_move)
-            
+            time.sleep(2)
+
             if(best_move == 362):
                 break
             elif(best_move == 361):
@@ -75,13 +76,15 @@ class MCTS:
 
             need_to_select_player = True
 
-            time.sleep(10)
-            print("Waiting for player white to make move")
-
             # the move that player white makes is not available to player black.
 
             # FIX: use the board state as the action spaace instead of the sgf data because the game is better represented as the board state instead of the moves in sgf data
             board_state = board.get_sgf_data()
+
+            print("Waiting for player white to make move")
+            while board_state[-1] == best_move:
+                time.sleep(1)
+                board_state = board.get_sgf_data()
             
             parent.get_action_space().pop(board_state[-1])
 
