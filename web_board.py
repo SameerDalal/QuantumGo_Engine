@@ -37,6 +37,9 @@ class Board:
         
         options = webdriver.ChromeOptions()
         #options.add_argument("--headless")
+        options.add_argument("--disable-logging")
+        options.add_experimental_option('excludeSwitches', ['enable-logging'])
+
         self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
         self.driver.set_window_position(1000, 0)
