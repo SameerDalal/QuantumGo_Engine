@@ -4,6 +4,8 @@
 
 Clone the repository here `https://github.com/SameerDalal/QuantumGo_Engine.git`
 
+Use `git checkout cuda` to switch to the cuda branch
+
 ## Prerequisites
 Google Chrome
 
