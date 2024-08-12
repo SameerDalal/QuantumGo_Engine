@@ -2,6 +2,9 @@ import tkinter as tk
 from enum import Enum
 from typing import List, Tuple, Optional
 from action_space import action_map_19x19
+from numba import cuda
+import numpy as np
+
 
 class Color(Enum):
     EMPTY = 0
@@ -55,6 +58,10 @@ class QuantumGo:
         self.current_player = Color.BLACK
         self.captures = {Color.BLACK: 0, Color.WHITE: 0}
         self.consecutive_passes = 0
+
+        #change threads per block    
+        self.threads_per_block = 128
+        
 
     def play_move(self, player: Color, move: object):
         if self.phase == "gameover":
@@ -112,6 +119,7 @@ class QuantumGo:
             raise ValueError("Cannot place a stone on an occupied intersection.")
         subgame.set(coord, player)
         self.remove_captures(subgame, player, coord)
+    
 
     def remove_captures(self, subgame: BadukBoard, player: Color, coord: Coordinate, is_quantum: bool = False):
         opponent = Color.BLACK if player == Color.WHITE else Color.WHITE
@@ -122,16 +130,40 @@ class QuantumGo:
                 group = self.get_group(subgame, neighbor)
                 if not self.group_has_liberties(subgame, group):
                     self.captures[player] += len(group)
-                    for stone in group:
-                        subgame.set(stone, Color.EMPTY)
-                        captured_stones.append(stone)
-                        if stone in self.quantum_stones:
-                            #if quantum stone is captured, remove the same colored quantum stone from the other board
-                            other_quantum_stone = next(element for element in self.quantum_stones if element != stone)
-                            if(idx == 0): 
-                                self.subgames[0].set(other_quantum_stone, Color.EMPTY)
-                            else:
-                                self.subgames[1].set(other_quantum_stone, Color.EMPTY)
+                    
+                    host_board_array = np.array([[subgame.board[y][x].value for x in range(subgame.width)] for y in range(subgame.height)])
+                    host_group_array = np.array([(stone.x, stone.y) for stone in group])
+                    host_captures_array = np.zeros(len(host_group_array), dtype=np.int32)
+
+                    blocks_per_grid = (len(host_group_array) + (self.threads_per_block - 1)) // self.threads_per_block
+
+                    device_board_array = cuda.to_device(host_board_array)
+                    device_group_array = cuda.to_device(host_group_array)
+                    device_captures_array = cuda.to_device(host_captures_array)
+
+                    remove_captures_kernel[blocks_per_grid, self.threads_per_block](
+                        device_board_array, device_group_array, player.value, device_captures_array
+                    )
+
+
+                    host_board_array = device_board_array.copy_to_host()
+                    host_group_array = device_group_array.copy_to_host()
+                    host_captures_array = device_captures_array.copy_to_host()
+                    
+
+                    for i in range(len(host_group_array)):
+                        if host_captures_array[i] == 1:
+                            x, y = host_group_array[i]
+                            subgame.set(Coordinate([x + 1, y + 1]), Color.EMPTY)
+                            captured_stones.append(Coordinate([x + 1, y + 1]))
+
+                            if captured_stones[-1] in self.quantum_stones:
+                                #if quantum stone is captured, remove the same colored quantum stone from the other board
+                                other_quantum_stone = next(element for element in self.quantum_stones if element != captured_stones[-1])
+                                if idx == 0:
+                                    self.subgames[0].set(other_quantum_stone, Color.EMPTY)
+                                else:
+                                    self.subgames[1].set(other_quantum_stone, Color.EMPTY)
             idx += 1    
         return captured_stones
 
@@ -153,23 +185,46 @@ class QuantumGo:
         return list(group)
 
     def group_has_liberties(self, subgame: BadukBoard, group: List[Coordinate]) -> bool:
-        for stone in group:
-            for neighbor in subgame.neighbors(stone):
-                if subgame.at(neighbor) == Color.EMPTY:
-                    return True
-        return False
+        host_board_array = np.array([[subgame.board[y][x].value for x in range(subgame.width)] for y in range(subgame.height)])
+        host_group_array = np.array([(stone.x, stone.y) for stone in group], dtype=np.int32)
+        host_result_array = np.array([False], dtype=np.bool_)
+            
+        blocks_per_grid = (len(host_group_array) + (self.threads_per_block - 1)) // self.threads_per_block
+
+        device_board_array = cuda.to_device(host_board_array)
+        device_group_array = cuda.to_device(host_group_array)
+        device_result_array = cuda.to_device(host_result_array)
+        
+        group_has_liberties_kernel[blocks_per_grid, self.threads_per_block](device_board_array, device_group_array, device_result_array)
+        
+        host_result_array = device_result_array.copy_to_host()
+
+        return host_result_array[0]
 
     def deduce_captures(self, subgame: BadukBoard) -> List[Coordinate]:
+
+        width = subgame.width
+        height = subgame.height
+        host_board_array = np.array([[subgame.board[y][x].value for x in range(width)] for y in range(height)])
+        host_captures_array = np.zeros(width * height, dtype=np.int32)
+        
+        #number of blocks needed to cover the entire board
+        blocks_per_grid = (width * height + (self.threads_per_block - 1)) // self.threads_per_block
+
+        device_board_array = cuda.to_device(host_board_array)
+        device_captures_array = cuda.to_device(host_captures_array)
+        
+        deduce_captures_kernel[blocks_per_grid, self.threads_per_block](device_board_array, width, height, device_captures_array)
+        
+        host_captures_array = device_captures_array.copy_to_host()
+
         captures = []
-        for x in range(subgame.width):
-            for y in range(subgame.height):
-                coord = Coordinate([x, y])
-                stone = subgame.at(coord)
-                if stone != Color.EMPTY:
-                    group = self.get_group(subgame, coord)
-                    if not self.group_has_liberties(subgame, group):
-                        if not self.is_surrounded_by_same_color(subgame, coord):
-                            captures.extend(group)
+        for idx in range(width * height):
+            if host_captures_array[idx] == 1:
+                x = idx % width
+                y = idx // width
+                captures.append(Coordinate([x + 1, y + 1]))
+        
         return captures
 
     def get_board_state(self) -> Tuple[List[List[Color]], List[List[Color]]]:
@@ -246,7 +301,6 @@ class QuantumGoGUI:
         except ValueError as e:
             tk.messagebox.showerror("Invalid Move", str(e))
 
-
 class LocalSimulatorWithGUI():
 
     def __init__(self):
@@ -258,7 +312,7 @@ class LocalSimulatorWithGUI():
     def play_moves(self, actions):
         index = 0
         for action in actions:
-
+            
             player = Color.BLACK if index % 2 == 0 else Color.WHITE
 
             action = 'pass' if action == 361 else Coordinate(action_map_19x19[action])
@@ -295,4 +349,50 @@ class LocalSimulator():
     
     def display_board(self):
         pass
-    
+
+# need to modify blocks per grid and threads per block
+
+@cuda.jit
+def remove_captures_kernel(board, group, player, captures):
+    idx = cuda.grid(1)
+    if idx < len(group):
+        x, y = group[idx]
+        if board[y, x] != player:
+            captures[idx] = 1
+            board[y, x] = 0  
+
+@cuda.jit
+def group_has_liberties_kernel(board, group, result):
+    idx = cuda.grid(1)
+    if idx < len(group):
+        x, y = group[idx]
+        if y > 0 and board[y - 1, x] == Color.EMPTY.value:
+            result[0] = True
+        elif y < board.shape[0] - 1 and board[y + 1, x] == Color.EMPTY.value:
+            result[0] = True
+        elif x > 0 and board[y, x - 1] == Color.EMPTY.value:
+            result[0] = True
+        elif x < board.shape[1] - 1 and board[y, x + 1] == Color.EMPTY.value:
+            result[0] = True
+
+@cuda.jit
+def deduce_captures_kernel(board, width, height, captures):
+    idx = cuda.grid(1)
+    if idx < width * height:
+        x = idx % width
+        y = idx // width
+        stone = board[y, x]
+        
+        if stone != Color.EMPTY.value:
+            has_liberty = False
+            if y > 0 and board[y - 1, x] == Color.EMPTY.value:
+                has_liberty = True
+            elif y < height - 1 and board[y + 1, x] == Color.EMPTY.value:
+                has_liberty = True
+            elif x > 0 and board[y, x - 1] == Color.EMPTY.value:
+                has_liberty = True
+            elif x < width - 1 and board[y, x + 1] == Color.EMPTY.value:
+                has_liberty = True
+
+            if not has_liberty:
+                captures[idx] = 1

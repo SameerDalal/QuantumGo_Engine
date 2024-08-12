@@ -3,18 +3,22 @@ from action_space import action_map_19x19
 from web_board import Board
 from web_board import Player
 import time
-from concurrent.futures import ThreadPoolExecutor
-from threading import Lock
+
+#from concurrent.futures import ThreadPoolExecutor
+#from threading import Lock
 
 import copy
 
 from local_simulator import LocalSimulator
 from local_simulator import LocalSimulatorWithGUI
 
-from numba import cuda
-import numpy as np
+import argparse
 
-
+def arg_parser():
+    parser = argparse.ArgumentParser(description="Resimulate a child node a certain number of times")
+    parser.add_argument('-l', type=int, default=3, help="Number of loops")
+    args = parser.parse_args()
+    return args.l
 
 #monte carlo tree search
 class MCTS:
@@ -41,39 +45,51 @@ class MCTS:
         while True:
 
             parent.create_children(parent.get_board_state(), parent.get_action_space(), parent)
-            parent.simulate_children_and_update()
+            num_loops = arg_parser()
+            start = time.time()
+            print("Simulating ...")
+            for i in range(num_loops):
+                parent.simulate_children_and_update()
+            end = time.time()
+            print(f"Time taken to simulate 362 children {num_loops} times: {end - start:.2f} seconds")
 
             if(need_to_select_player):
                 player_black.select_player(player_has_passed)
 
             best_child = parent.get_best_child()
 
-            next_move = parent.get_best_move(best_child)
+            best_move = parent.get_best_move(best_child)
 
-            print("Best move: ", next_move)
+            print("Best move for engine: Action", best_move)
 
-            player_black.make_move(next_move)
+            player_black.make_move(best_move)
             
-            if(next_move == 362):
+            if(best_move == 362):
                 break
-            elif(next_move == 361):
+            elif(best_move == 361):
                 player_has_passed = True
         
             parent = best_child
 
-            parent.get_action_space().pop(next_move)
+            parent.get_action_space().pop(best_move)
 
             need_to_select_player = True
 
-            #need to wait until player white makes move.
             time.sleep(10)
+            print("Waiting for player white to make move")
 
             # the move that player white makes is not available to player black.
-            parent.get_action_space().pop(board.get_sgf_data()[-1])
 
+            # FIX: use the board state as the action spaace instead of the sgf data because the game is better represented as the board state instead of the moves in sgf data
+            board_state = board.get_sgf_data()
+            
+            parent.get_action_space().pop(board_state[-1])
+
+            parent.set_board_state(board_state)
+            
+            
         print("Game Over")
 
-        
 class Node:
 
     def __init__(self, board_state, action_space, parent, games_played, games_won, next_move):
@@ -156,17 +172,19 @@ class Node:
             parent.set_child(child)
             child.set_parent(parent)
 
-
     def simulate_children_and_update(self):
 
         def simulate_child(child):
-            
+
             child_board_state = child.get_board_state()
-            child_board_state.append(child.get_next_move())
+            child_next_move = child.get_next_move()
 
-            child.set_board_state(child_board_state)
+            #if the child is resimulated then the board state does not need to be updated since the same board state will be played again
+            if not child_next_move in child_board_state:
 
-            print("Child board state: ", child.get_board_state())
+                child_board_state.append(child_next_move)
+
+                child.set_board_state(child_board_state)
 
             child_result = child.simulate(child_board_state.copy())
         
@@ -175,17 +193,10 @@ class Node:
             
             child.set_games_played(child.get_games_played() + 1)
 
-        start = time.time()
-        """
-        with ThreadPoolExecutor() as executor:
-            executor.map(simulate_child, self.children)
-        """
+
         for child in self.children:
             simulate_child(child)
         
-        end = time.time()
-        print("Time taken to simulate children: ", end - start)
-        print("Done simulating the next round of children")
 
     def simulate(self, prev_board_state):
 
@@ -200,7 +211,9 @@ class Node:
         index = 0
 
         for move in current_game_moves:
-            if(move != 362):
+            if (move == 362):
+                return 'B' if total_moves % 2 == 0 else 'W'
+            else:
                 temp_action_space.pop(move)
 
         while True:
@@ -215,16 +228,16 @@ class Node:
                 #the game result if one player resigns
                 return 'B' if total_moves % 2 == 0 else 'W'
 
-
             if(random_action == 361 and current_game_moves[-1] == 361):
                 current_game_moves.append(random_action)
                 game = LocalSimulator()
-                print(current_game_moves)
                 game.play_moves(current_game_moves)
                 game_result = game.get_result()
-                print("Game result when both players passed:", game_result)
-                game.display_board()
-                #game.root.destroy()  need this line if running with GUI
+
+                #need next two lines if running with GUI
+                #game.display_board()
+                #game.root.destroy()
+                
                 return game_result
             
             # we dont want to remove the 'pass' action from the action space
@@ -236,11 +249,7 @@ class Node:
             total_moves += 1
             index +=1
 
-            
-
         
-       
-
     def get_best_child(self):
 
         max_ratio = 0
@@ -265,4 +274,3 @@ class Node:
     def get_best_move(self, child):
 
         return child.get_next_move()
-    

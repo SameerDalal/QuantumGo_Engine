@@ -1,6 +1,5 @@
 from engine import MCTS
 
-
 class QuantumGame():
             
     def __init__(self):
