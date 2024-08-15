@@ -1,3 +1,4 @@
 profile_output.prof
 profile_output.txt
 __pycache__/
+.venv
