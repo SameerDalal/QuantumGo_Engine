@@ -102,7 +102,7 @@ class QuantumGo:
             for i in range(2):
                 subgame = self.subgames[i]
                 self.play_subgame_move(subgame, player, moves[i])
-                captures.append(self.deduce_captures(subgame))
+                captures.append(self.deduce_captures(subgame, move))
 
         self.round += 1
         self.current_player = Color.WHITE if self.current_player == Color.BLACK else Color.BLACK
@@ -159,17 +159,15 @@ class QuantumGo:
                     return True
         return False
 
-    def deduce_captures(self, subgame: BadukBoard) -> List[Coordinate]:
+    def deduce_captures(self, subgame: BadukBoard, last_move: Coordinate) -> List[Coordinate]:
         captures = []
-        for x in range(subgame.width):
-            for y in range(subgame.height):
-                coord = Coordinate([x, y])
-                stone = subgame.at(coord)
-                if stone != Color.EMPTY:
-                    group = self.get_group(subgame, coord)
-                    if not self.group_has_liberties(subgame, group):
-                        if not self.is_surrounded_by_same_color(subgame, coord):
-                            captures.extend(group)
+        for coord in subgame.neighbors(last_move):
+            stone = subgame.at(coord)
+            if stone != Color.EMPTY:
+                group = self.get_group(subgame, coord)
+                if not self.group_has_liberties(subgame, group):
+                    if not self.is_surrounded_by_same_color(subgame, coord):
+                        captures.extend(group)
         return captures
 
     def get_board_state(self) -> Tuple[List[List[Color]], List[List[Color]]]:
