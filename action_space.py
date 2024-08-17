@@ -1,5 +1,5 @@
 def make_action_map(size: int):
-    m = { (size * x + y): (x + 1, y + 1) for y in range(size) for x in range(size) }
+    m = { (size * x + y): (x, y) for y in range(size) for x in range(size) }
     m[len(m)] = 'pass'
     m[len(m)] = 'resign'
     return m
