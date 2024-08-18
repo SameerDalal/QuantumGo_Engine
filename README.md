@@ -73,3 +73,7 @@ In `engine.py` uncomment the following lines:
 game.display_board()
 game.root.destroy()
 ```
+
+## Testing
+
+Besides manual testing, you can run unit tests with `python -m unittest`.
