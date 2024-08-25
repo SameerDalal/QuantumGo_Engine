@@ -86,8 +86,8 @@ switch_19x19 = {
 def get_offset_19x19(action):
     return (
         
-        switch_19x19.get(action[0], default_case_19x19)(), 
-        switch_19x19.get(action[1], default_case_19x19)()
+        switch_19x19.get(action[0] + 1, default_case_19x19)(),
+        switch_19x19.get(action[1] + 1, default_case_19x19)()
         
         )
 
@@ -141,8 +141,8 @@ def get_offset_9x9(action):
 
     return (
         
-        switch_9x9.get(action[0], default_case_9x9)(), 
-        switch_9x9.get(action[1], default_case_9x9)()
+        switch_9x9.get(action[0] + 1, default_case_9x9)(),
+        switch_9x9.get(action[1] + 1, default_case_9x9)()
         
     )
 
@@ -179,7 +179,7 @@ def get_offset_5x5(action):
 
     return (
         
-        switch_5x5.get(action[0], default_case_5x5)(), 
-        switch_5x5.get(action[1], default_case_5x5)()
+        switch_5x5.get(action[0] + 1, default_case_5x5)(),
+        switch_5x5.get(action[1] + 1, default_case_5x5)()
         
     )
