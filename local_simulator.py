@@ -8,19 +8,7 @@ class Color(Enum):
     BLACK = 1
     WHITE = 2
 
-class Coordinate:
-    def __init__(self, coord: List[int]):
-        self.x = int(coord[0]) -1
-        self.y = int(coord[1]) -1
-
-    def __eq__(self, other):
-        return self.x == other.x and self.y == other.y
-
-    def __hash__(self):
-        return hash((self.x, self.y))
-
-    def __repr__(self):
-        return f"({self.x}, {self.y})"
+type Coordinate = tuple[int, int]
 
 class BadukBoard:
     def __init__(self, width: int, height: int):
@@ -29,20 +17,20 @@ class BadukBoard:
         self.board = [[Color.EMPTY for _ in range(width)] for _ in range(height)]
 
     def at(self, coord: Coordinate) -> Color:
-        return self.board[coord.y][coord.x]
+        return self.board[coord[1]][coord[0]]
 
     def set(self, coord: Coordinate, color: Color):
-        self.board[coord.y][coord.x] = color
+        self.board[coord[1]][coord[0]] = color
 
     def is_in_bounds(self, coord: Coordinate) -> bool:
-        return 0 <= coord.x < self.width and 0 <= coord.y < self.height
+        return 0 <= coord[0] < self.width and 0 <= coord[1] < self.height
 
     def serialize(self) -> List[List[Color]]:
         return [[color for color in row] for row in self.board]
 
     def neighbors(self, coord: Coordinate) -> List[Coordinate]:
         deltas = [(-1, 0), (1, 0), (0, -1), (0, 1)]
-        return [Coordinate([coord.x + dx + 1, coord.y + dy + 1]) for dx, dy in deltas if self.is_in_bounds(Coordinate([coord.x + dx + 1, coord.y + dy + 1]))]
+        return [(coord[0] + dx, coord[1] + dy) for dx, dy in deltas if self.is_in_bounds((coord[0] + dx, coord[1] + dy))]
 
 class QuantumGo:
     def __init__(self, width: int = 19, height: int = 19, komi: float = 6.5):
@@ -209,7 +197,7 @@ class QuantumGoGUI:
             for x in range(19):
                 color = board[y][x]
                 if color != Color.EMPTY:
-                    is_quantum = Coordinate([x, y]) in self.game.quantum_stones
+                    is_quantum = (x, y) in self.game.quantum_stones
                     self.draw_stone(canvas, x, y, color, is_quantum)
 
 
@@ -232,7 +220,7 @@ class QuantumGoGUI:
     def on_click(self, event, board_index):
         x = event.x // self.cell_size +1
         y = event.y // self.cell_size +1
-        move = Coordinate([x, y])
+        move = (x, y)
         player = self.game.current_player
 
         try:
@@ -259,7 +247,7 @@ class LocalSimulatorWithGUI():
 
             player = Color.BLACK if index % 2 == 0 else Color.WHITE
 
-            action = 'pass' if action == 361 else Coordinate(action_map_19x19[action])
+            action = 'pass' if action == 361 else action_map_19x19[action]
 
             self.game.play_move(player, action)
 
@@ -284,7 +272,7 @@ class LocalSimulator():
 
             player = Color.BLACK if index % 2 == 0 else Color.WHITE
 
-            action = 'pass' if action == 361 else Coordinate(action_map_19x19[action])
+            action = 'pass' if action == 361 else action_map_19x19[action]
 
             self.game.play_move(player, action)        
 
