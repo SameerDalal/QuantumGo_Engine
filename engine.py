@@ -38,12 +38,8 @@ class MCTS:
         
         parent = Node([], action_map_19x19.copy(), None, 0, 0, None)
 
-        need_to_select_player = False
-
-        player_has_passed = False
-
         while True:
-
+            
             parent.create_children(parent.get_board_state(), parent.get_action_space(), parent)
             num_loops = arg_parser()
             start = time.time()
@@ -52,9 +48,6 @@ class MCTS:
                 parent.simulate_children_and_update()
             end = time.time()
             print(f"Time taken to simulate {len(parent.get_children())} children {num_loops} times: {end - start:.2f} seconds")
-
-            if(need_to_select_player):
-                player_black.select_player(player_has_passed)
 
             best_child = parent.get_best_child()
 
@@ -67,8 +60,6 @@ class MCTS:
 
             if(best_move == 362):
                 break
-            elif(best_move == 361):
-                player_has_passed = True
         
             parent = best_child
 
@@ -86,6 +77,11 @@ class MCTS:
                 time.sleep(1)
                 board_state = board.get_sgf_data()
             
+            #issue #8
+            if board_state[-1] == 361:
+                print("Player white passed")
+                player_black.select_player()
+
             parent.get_action_space().pop(board_state[-1])
 
             parent.set_board_state(board_state)

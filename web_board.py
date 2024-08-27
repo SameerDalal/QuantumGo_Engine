@@ -36,7 +36,7 @@ class Board:
         self.stone_coordinates = []
         
         options = webdriver.ChromeOptions()
-        #options.add_argument("--headless")
+        options.add_argument("--headless")
         options.add_argument("--disable-logging")
         options.add_experimental_option('excludeSwitches', ['enable-logging'])
 
@@ -100,7 +100,7 @@ class Board:
             processed_actions = []
             for move in sgf_data:
                 #converts letter coordinates to numerical coordinates then gets the key corrresponding to the numerical coordinates and adds it to processed_actions list
-                processed_actions.append(reverse_action_map_19x19.get(tuple([ord(move[3:-1][0])-ord('a')+1, ord(move[3:-1][1])-ord('a')+1]), 'invalid'))
+                processed_actions.append(reverse_action_map_19x19.get(tuple([ord(move[3:-1][0])-ord('a'), ord(move[3:-1][1])-ord('a')]), 'invalid'))
             return processed_actions
         else: 
             print("Error getting game moves")
@@ -179,7 +179,7 @@ class Player:
             # we need the offset because it corresponds an action to a specific spot on the board for the driver to click on 
             offset_x, offset_y = get_offset_19x19(action_map_19x19[action])
             action_chains = ActionChains(self.driver)
-            action_chains.move_to_element_with_offset(board_svg, offset_x, offset_y).click().perform()
+            action_chains.move_to_element_with_offset(board_svg, int(offset_x), int(offset_y)).click().perform()
 
     def select_player(self, player_has_passed=False):
 

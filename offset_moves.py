@@ -85,12 +85,11 @@ switch_19x19 = {
 
 def get_offset_19x19(action):
     return (
-        
+
         switch_19x19.get(action[0] + 1, default_case_19x19)(),
         switch_19x19.get(action[1] + 1, default_case_19x19)()
         
         )
-
 
 def case_a_9x9():
     return -159.999
